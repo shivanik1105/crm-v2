@@ -48,7 +48,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Simulate email stream to CRM")
     parser.add_argument("--file", default="email-data-advanced.json", help="Path to email JSON file")
     parser.add_argument("--speed", type=int, default=1, help="Emails per second (0 = all at once)")
-    parser.add_argument("--url", default="http://127.0.0.1:8000", help="API base URL")
+    parser.add_argument("--url", default="http://localhost:8000", help="API base URL")
     args = parser.parse_args()
     
     asyncio.run(simulate(args.file, args.speed, args.url))

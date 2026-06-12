@@ -14,7 +14,7 @@ class Email(Base):
     subject = Column(Text, nullable=True)
     body = Column(Text, nullable=False)
     body_truncated = Column(Boolean, default=False)
-    timestamp = Column(DateTime, nullable=False, index=True)
+    timestamp = Column(DateTime(timezone=True), nullable=False, index=True)
     category = Column(String(100), default="General")
     sentiment_score = Column(Float, default=0.0)
     urgency = Column(String(50), default="Low")

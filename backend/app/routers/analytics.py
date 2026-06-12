@@ -179,47 +179,40 @@ async def get_agent_performance(
 async def get_response_time_heatmap(
     db: AsyncSession = Depends(get_db)
 ):
-    stmt = select(Email).where(Email.created_at != None)
-    result = await db.execute(stmt)
-    emails = result.scalars().all()
-    
-    heatmap = {}
-    days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-    
-    for email in emails:
-        if email.created_at and email.timestamp:
-            # Calculate processing time (from creation to classification)
-            diff_minutes = abs((email.created_at - email.timestamp).total_seconds() / 60)
-            hour_block = (email.timestamp.hour // 4) * 4
-            day_name = days[email.timestamp.weekday()]
-            key = f"{day_name}_{hour_block}:00"
-            
-            if key not in heatmap:
-                heatmap[key] = {"total_time": 0, "count": 0, "day": day_name, "hour": f"{hour_block}:00"}
-            heatmap[key]["total_time"] += min(diff_minutes, 120)  # Cap at 120 minutes
-            heatmap[key]["count"] += 1
-    
-    data = []
-    for key, val in heatmap.items():
-        data.append({
-            "day": val["day"],
-            "hour": val["hour"],
-            "avg_response": round(val["total_time"] / val["count"], 1) if val["count"] > 0 else 0,
-            "count": val["count"]
-        })
-    
-    # Sort by day and hour
-    day_order = {day: i for i, day in enumerate(days)}
-    data.sort(key=lambda x: (day_order.get(x["day"], 99), int(x["hour"].split(":")[0])))
-    
-    if not data:
-        for day in days[:5]:
-            for hour in range(0, 24, 4):
-                data.append({
-                    "day": day,
-                    "hour": f"{hour}:00",
-                    "avg_response": 0,
-                    "count": 0
-                })
-    
-    return {"heatmap": data}
+    try:
+        # Use raw SQL for better reliability
+        from sqlalchemy import text
+        
+        query = text("""
+            SELECT 
+                to_char(timestamp, 'Dy') as day,
+                (EXTRACT(HOUR FROM timestamp)::INT / 4 * 4) as hour_block,
+                AVG(EXTRACT(EPOCH FROM (created_at - timestamp))/60) as avg_minutes,
+                COUNT(*) as email_count
+            FROM emails
+            WHERE created_at > timestamp
+            GROUP BY to_char(timestamp, 'Dy'), (EXTRACT(HOUR FROM timestamp)::INT / 4 * 4)
+            ORDER BY 
+                CASE to_char(timestamp, 'Dy')
+                    WHEN 'Mon' THEN 1 WHEN 'Tue' THEN 2 WHEN 'Wed' THEN 3
+                    WHEN 'Thu' THEN 4 WHEN 'Fri' THEN 5 WHEN 'Sat' THEN 6 WHEN 'Sun' THEN 7
+                END,
+                hour_block
+        """)
+        
+        result = await db.execute(query)
+        rows = result.fetchall()
+        
+        data = []
+        for row in rows:
+            data.append({
+                "day": row[0],
+                "hour": f"{int(row[1])}:00",
+                "avg_response": round(float(row[2]), 1),
+                "count": int(row[3])
+            })
+        
+        return {"heatmap": data}
+    except Exception as e:
+        print(f"Heatmap error: {e}")
+        return {"heatmap": []}
