@@ -1,0 +1,45 @@
+FROM python:3.11-slim-bookworm
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    libpq-dev gcc g++ curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies in layers for better caching
+# Install fast dependencies first
+RUN pip install --no-cache-dir \
+    fastapi==0.110.3 \
+    uvicorn[standard]==0.27.1 \
+    sqlalchemy[asyncio]==2.0.27 \
+    asyncpg==0.29.0 \
+    alembic==1.13.1 \
+    pydantic==2.6.1 \
+    pydantic-settings==2.1.0 \
+    httpx==0.26.0 \
+    beautifulsoup4==4.12.3 \
+    redis==5.0.1 \
+    python-multipart==0.0.9 \
+    email-validator==2.1.0 \
+    python-json-logger==2.0.7 \
+    pytest==7.4.4 \
+    pytest-asyncio==0.23.3 \
+    pgvector==0.2.4
+
+# Install sentence-transformers last (takes the longest)
+RUN pip install --no-cache-dir sentence-transformers==2.3.1
+
+# Copy application files
+COPY backend/ ./backend/
+COPY knowledge_base/ ./knowledge_base/
+COPY scripts/ ./scripts/
+COPY migrations/ ./backend/migrations/
+COPY alembic.ini ./backend/alembic.ini
+COPY email-data-advanced.json ./email-data-advanced.json
+COPY pyproject.toml ./pyproject.toml
+
+ENV PYTHONPATH=/app/backend
+WORKDIR /app/backend
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

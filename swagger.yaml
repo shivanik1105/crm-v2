@@ -1,0 +1,1110 @@
+openapi: 3.0.3
+info:
+  title: SenAI CRM API
+  description: Agentic CRM Intelligence Platform
+  version: 1.0.0
+  contact:
+    name: SenAI CRM Team
+
+servers:
+  - url: http://localhost:8000/api
+    description: Local development server
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+                  version:
+                    type: string
+                    example: 1.0.0
+
+  /ingest:
+    post:
+      summary: Ingest a new email
+      operationId: ingestEmail
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmailIngest'
+            examples:
+              standard:
+                summary: Standard email
+                value:
+                  message_id: "msg_001"
+                  sender: "customer@example.com"
+                  recipient: "support@company.com"
+                  subject: "Billing question"
+                  body: "Hi, I have a question about my invoice."
+                  timestamp: "2024-01-15T10:00:00Z"
+                  headers: {}
+      responses:
+        '200':
+          description: Email processed (new or existing)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmailIngestResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /status/{job_id}:
+    get:
+      summary: Get ingestion job status
+      operationId: getJobStatus
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Job status retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  job_id:
+                    type: string
+                  status:
+                    type: string
+                  category:
+                    type: string
+                  urgency:
+                    type: string
+                  requires_human:
+                    type: boolean
+                  classification:
+                    type: object
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /threads/{contact_email}:
+    get:
+      summary: Get thread by contact email
+      operationId: getThread
+      parameters:
+        - name: contact_email
+          in: path
+          required: true
+          schema:
+            type: string
+            format: email
+      responses:
+        '200':
+          description: Thread retrieved with emails
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ThreadOut'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /respond/{email_id}:
+    post:
+      summary: Mark email as replied
+      operationId: respondToEmail
+      parameters:
+        - name: email_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Email marked as replied
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  email_id:
+                    type: string
+                  status:
+                    type: string
+                  message:
+                    type: string
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /drafts/{email_id}:
+    patch:
+      summary: Update draft for email
+      operationId: updateDraft
+      parameters:
+        - name: email_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                draft_body:
+                  type: string
+      responses:
+        '200':
+          description: Draft updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  email_id:
+                    type: string
+                  draft_updated:
+                    type: boolean
+                  draft_body:
+                    type: string
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /analytics/sentiment-trend:
+    get:
+      summary: Get sentiment trend for a sender
+      operationId: getSentimentTrend
+      parameters:
+        - name: sender
+          in: query
+          required: true
+          schema:
+            type: string
+            format: email
+        - name: days
+          in: query
+          schema:
+            type: integer
+            default: 30
+            minimum: 1
+            maximum: 365
+      responses:
+        '200':
+          description: Sentiment trend data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SentimentTrendResponse'
+
+  /analytics/category-distribution:
+    get:
+      summary: Get category distribution across all emails
+      operationId: getCategoryDistribution
+      responses:
+        '200':
+          description: Category distribution
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoryDistributionResponse'
+
+  /analytics/at-risk:
+    get:
+      summary: Get at-risk accounts panel
+      operationId: getAtRiskAccounts
+      responses:
+        '200':
+          description: At-risk accounts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AtRiskPanelResponse'
+
+  /analytics/agent-performance:
+    get:
+      summary: Get agent performance metrics
+      operationId: getAgentPerformance
+      responses:
+        '200':
+          description: Agent performance metrics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentPerformanceMetrics'
+
+  /rag/search:
+    get:
+      summary: Search knowledge base via RAG
+      operationId: searchRAG
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+        - name: top_k
+          in: query
+          schema:
+            type: integer
+            default: 3
+            minimum: 1
+            maximum: 10
+      responses:
+        '200':
+          description: RAG search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  query:
+                    type: string
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        source:
+                          type: string
+                        heading:
+                          type: string
+                        chunk_index:
+                          type: integer
+                        content:
+                          type: string
+                        similarity_score:
+                          type: number
+                  total:
+                    type: integer
+
+  /intelligence/reputation:
+    get:
+      summary: Get public reputation data for a company
+      operationId: getReputation
+      parameters:
+        - name: company_name
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Reputation data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  company:
+                    type: string
+                  data:
+                    type: object
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /agent/dry-run/{email_id}:
+    post:
+      summary: Run agent in dry-run mode
+      operationId: dryRunAgent
+      parameters:
+        - name: email_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentDryRunRequest'
+      responses:
+        '200':
+          description: Full agent reasoning trace without executing actions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentDryRunResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /contacts/{email}:
+    get:
+      summary: Get contact by email
+      operationId: getContact
+      parameters:
+        - name: email
+          in: path
+          required: true
+          schema:
+            type: string
+            format: email
+      responses:
+        '200':
+          description: Contact profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContactOut'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    
+    patch:
+      summary: Update contact fields
+      operationId: updateContact
+      parameters:
+        - name: email
+          in: path
+          required: true
+          schema:
+            type: string
+            format: email
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                tier:
+                  type: string
+                account_value:
+                  type: number
+                vip_status:
+                  type: boolean
+                churn_risk_score:
+                  type: number
+      responses:
+        '200':
+          description: Contact updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  email:
+                    type: string
+                  updated:
+                    type: boolean
+                  fields:
+                    type: array
+                    items:
+                      type: string
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /dashboard/stats:
+    get:
+      summary: Get dashboard statistics
+      operationId: getDashboardStats
+      responses:
+        '200':
+          description: Dashboard statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardStatsResponse'
+
+  /audit/{entity_type}/{entity_id}:
+    get:
+      summary: Get audit log for an entity
+      operationId: getAuditLog
+      parameters:
+        - name: entity_type
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: entity_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Audit log entries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  entity_type:
+                    type: string
+                  entity_id:
+                    type: string
+                  logs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AuditLogEntry'
+                  total:
+                    type: integer
+
+  /emails/:
+    get:
+      summary: List all emails with filters
+      operationId: listEmails
+      tags: [Emails]
+      parameters:
+        - name: skip
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: urgency
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: requires_human
+          in: query
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: List of emails
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+
+  /emails/{email_id}:
+    get:
+      summary: Get single email with full details
+      operationId: getEmail
+      tags: [Emails]
+      parameters:
+        - name: email_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Email details
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /emails/{email_id}/reasoning:
+    get:
+      summary: Get AI reasoning trace for an email
+      operationId: getEmailReasoning
+      tags: [Emails]
+      parameters:
+        - name: email_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Reasoning trace
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /emails/{email_id}/rag-context:
+    get:
+      summary: Get RAG chunks used for this email
+      operationId: getEmailRAGContext
+      tags: [Emails]
+      parameters:
+        - name: email_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: RAG context chunks
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /emails/bulk/spam:
+    post:
+      summary: Bulk mark emails as spam
+      operationId: bulkMarkSpam
+      tags: [Emails]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email_ids:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: Bulk update result
+
+  /emails/bulk/assign:
+    post:
+      summary: Bulk assign emails to team member
+      operationId: bulkAssign
+      tags: [Emails]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email_ids:
+                  type: array
+                  items:
+                    type: string
+                assignee:
+                  type: string
+      responses:
+        '200':
+          description: Bulk assign result
+
+  /emails/bulk/archive:
+    post:
+      summary: Bulk archive emails
+      operationId: bulkArchive
+      tags: [Emails]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email_ids:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: Bulk archive result
+
+  /respond/drafts/{email_id}/approve:
+    post:
+      summary: Approve and send a draft reply
+      operationId: approveDraft
+      tags: [Respond]
+      parameters:
+        - name: email_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Draft approved and sent
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /analytics/response-time-heatmap:
+    get:
+      summary: Get response time heatmap by hour/day
+      operationId: getResponseTimeHeatmap
+      tags: [Analytics]
+      responses:
+        '200':
+          description: Heatmap data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  heatmap:
+                    type: array
+                    items:
+                      type: object
+
+  /threads/{contact_email}/summary:
+    get:
+      summary: Get AI-generated thread summary
+      operationId: getThreadSummary
+      tags: [Threads]
+      parameters:
+        - name: contact_email
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Thread summary
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  summary:
+                    type: string
+                  email_count:
+                    type: integer
+                  generated_by:
+                    type: string
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /ws:
+    get:
+      summary: WebSocket connection for real-time events
+      operationId: websocketConnect
+      tags: [WebSocket]
+      responses:
+        '101':
+          description: WebSocket upgrade
+
+components:
+  schemas:
+    ErrorEnvelope:
+      type: object
+      required:
+        - error_code
+        - message
+        - details
+      properties:
+        error_code:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+
+    EmailIngest:
+      type: object
+      required:
+        - message_id
+        - sender
+        - recipient
+        - body
+        - timestamp
+      properties:
+        message_id:
+          type: string
+          minLength: 1
+          maxLength: 255
+        sender:
+          type: string
+          format: email
+        recipient:
+          type: string
+          format: email
+        subject:
+          type: string
+          maxLength: 1000
+        body:
+          type: string
+          maxLength: 10000
+        timestamp:
+          type: string
+          format: date-time
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+
+    EmailIngestResponse:
+      type: object
+      properties:
+        job_id:
+          type: string
+        status:
+          type: string
+        message:
+          type: string
+        existing:
+          type: boolean
+        email_id:
+          type: string
+
+    EmailOut:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        message_id:
+          type: string
+        sender:
+          type: string
+        recipient:
+          type: string
+        subject:
+          type: string
+        body:
+          type: string
+        body_truncated:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        category:
+          type: string
+        sentiment_score:
+          type: number
+        urgency:
+          type: string
+        confidence:
+          type: number
+        requires_human:
+          type: boolean
+        status:
+          type: string
+        raw_entities:
+          type: object
+        classification_result:
+          type: object
+        created_at:
+          type: string
+          format: date-time
+
+    ThreadOut:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        sender_email:
+          type: string
+        subject:
+          type: string
+        category:
+          type: string
+        status:
+          type: string
+        last_updated_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        emails:
+          type: array
+          items:
+            $ref: '#/components/schemas/EmailOut'
+
+    ClassificationResult:
+      type: object
+      properties:
+        category:
+          type: string
+        subcategory:
+          type: string
+        urgency:
+          type: string
+          enum: [Low, Medium, High, Critical]
+        sentiment_score:
+          type: number
+          minimum: -1.0
+          maximum: 1.0
+        confidence:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+        requires_human:
+          type: boolean
+        escalation_reason:
+          type: string
+        keywords_detected:
+          type: array
+          items:
+            type: string
+        suggested_action:
+          type: string
+        rag_context_used:
+          type: boolean
+
+    AgentStep:
+      type: object
+      properties:
+        step_number:
+          type: integer
+        thought:
+          type: string
+        action:
+          type: string
+        action_input:
+          type: object
+        observation:
+          type: string
+
+    AgentTrace:
+      type: object
+      properties:
+        email_id:
+          type: string
+        classification:
+          type: object
+        steps:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgentStep'
+        final_recommendation:
+          type: string
+        draft_reply:
+          type: string
+        escalate:
+          type: boolean
+        escalation_brief:
+          type: string
+        tools_used:
+          type: array
+          items:
+            type: string
+        completed_at:
+          type: string
+          format: date-time
+        dry_run:
+          type: boolean
+
+    AgentDryRunRequest:
+      type: object
+      properties:
+        is_dry_run:
+          type: boolean
+          default: true
+
+    AgentDryRunResponse:
+      type: object
+      properties:
+        email_id:
+          type: string
+        trace:
+          $ref: '#/components/schemas/AgentTrace'
+        proposed_actions:
+          type: array
+          items:
+            type: string
+        confidence:
+          type: number
+
+    SentimentTrendResponse:
+      type: object
+      properties:
+        sender:
+          type: string
+        points:
+          type: array
+          items:
+            type: object
+            properties:
+              timestamp:
+                type: string
+                format: date-time
+              sentiment_score:
+                type: number
+              email_id:
+                type: string
+        moving_average:
+          type: number
+        trend_direction:
+          type: string
+        alert_triggered:
+          type: boolean
+
+    CategoryDistributionResponse:
+      type: object
+      properties:
+        distribution:
+          type: array
+          items:
+            type: object
+            properties:
+              category:
+                type: string
+              count:
+                type: integer
+              percentage:
+                type: number
+        total:
+          type: integer
+
+    AtRiskAccount:
+      type: object
+      properties:
+        sender:
+          type: string
+        churn_risk_score:
+          type: number
+        account_value:
+          type: number
+        unresolved_threads:
+          type: integer
+        last_email_date:
+          type: string
+          format: date-time
+        sentiment_trend:
+          type: string
+
+    AtRiskPanelResponse:
+      type: object
+      properties:
+        accounts:
+          type: array
+          items:
+            $ref: '#/components/schemas/AtRiskAccount'
+        total_at_risk:
+          type: integer
+
+    AgentPerformanceMetrics:
+      type: object
+      properties:
+        auto_reply_rate:
+          type: number
+        escalation_rate:
+          type: number
+        avg_confidence:
+          type: number
+        avg_tools_used:
+          type: number
+        total_processed:
+          type: integer
+        total_escalated:
+          type: integer
+
+    ContactOut:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+        name:
+          type: string
+        tier:
+          type: string
+        account_value:
+          type: number
+        vip_status:
+          type: boolean
+        churn_risk_score:
+          type: number
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    DashboardStatsResponse:
+      type: object
+      properties:
+        total_emails:
+          type: integer
+        total_threads:
+          type: integer
+        total_contacts:
+          type: integer
+        status_breakdown:
+          type: object
+          additionalProperties:
+            type: integer
+        urgency_breakdown:
+          type: object
+          additionalProperties:
+            type: integer
+        needs_human:
+          type: integer
+        auto_replied:
+          type: integer
+        escalated:
+          type: integer
+
+    AuditLogEntry:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        action:
+          type: string
+        actor:
+          type: string
+        diff:
+          type: object
+        timestamp:
+          type: string
+          format: date-time
+        ip_address:
+          type: string
+        user_agent:
+          type: string
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            error_code: VALIDATION_ERROR
+            message: Missing required fields
+            details: {}
+    
+    ValidationError:
+      description: Validation error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            error_code: VALIDATION_ERROR
+            message: Request validation failed
+            details:
+              body: Field required
+    
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            error_code: NOT_FOUND
+            message: Resource not found
+            details: {}
+    
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            error_code: INTERNAL_ERROR
+            message: An unexpected error occurred
+            details: {}

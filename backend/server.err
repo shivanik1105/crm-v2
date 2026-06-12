@@ -1,0 +1,7 @@
+Loading weights:   0%|          | 0/103 [00:00<?, ?it/s]Loading weights: 100%|##########| 103/103 [00:00<00:00, 1779.63it/s]
+INFO:     Started server process [5048]
+INFO:     Waiting for application startup.
+INFO:backend.app.main:Starting up SenAI CRM...
+INFO:backend.app.main:Database initialized
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
